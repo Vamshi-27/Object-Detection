@@ -1,0 +1,14 @@
+# Essential packages for YOLO Web Interface
+ultralytics>=8.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=9.5.0
+
+# Web interface packages
+flask>=2.3.0
+flask-socketio>=5.3.0
+werkzeug>=2.3.0
+
+# Core ML packages
+torch>=2.0.0
+torchvision>=0.15.0

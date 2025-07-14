@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 YOLO Object Detection</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 30px;
+            height: calc(100vh - 200px);
+        }
+
+        .control-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            height: fit-content;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+
+        .upload-area {
+            border: 3px dashed #bdc3c7;
+            border-radius: 10px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: #3498db;
+            background-color: #f8f9fa;
+        }
+
+        .upload-area.processing {
+            border-color: #f39c12;
+            background-color: #fef9e7;
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            color: #7f8c8d;
+        }
+
+        .upload-text {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary { background: #3498db; color: white; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-warning { background: #f39c12; color: white; }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .settings {
+            margin-top: 25px;
+        }
+
+        .setting-group {
+            margin-bottom: 20px;
+        }
+
+        .setting-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .setting-input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #bdc3c7;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .setting-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .range-container {
+            position: relative;
+        }
+
+        .range-value {
+            position: absolute;
+            right: 0;
+            top: -25px;
+            background: #3498db;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .display-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .display-area {
+            flex: 1;
+            background: #f8f9fa;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .placeholder {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 1.2rem;
+        }
+
+        .result-image, .webcam-feed {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .results-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .detection-item {
+            background: white;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .detection-class {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .detection-confidence {
+            background: #3498db;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+        }
+
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            font-size: 0.9rem;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success { background: #27ae60; }
+        .notification.error { background: #e74c3c; }
+        .notification.info { background: #3498db; }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .control-panel {
+                order: 2;
+            }
+        }
+
+        .file-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 YOLO Object Detection</h1>
+            <p>Upload images, videos, or use webcam for real-time object detection</p>
+        </div>
+
+        <div class="main-content">
+            <div class="control-panel">
+                <h3 class="section-title">📋 Controls</h3>
+                
+                <!-- Upload Areas -->
+                <div class="upload-area" id="imageUpload" onclick="document.getElementById('imageInput').click()">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">Click or drag image here</div>
+                </div>
+                
+                <div class="upload-area" id="videoUpload" onclick="document.getElementById('videoInput').click()">
+                    <div class="upload-icon">🎬</div>
+                    <div class="upload-text">Click or drag video here</div>
+                </div>
+
+                <!-- Hidden file inputs -->
+                <input type="file" id="imageInput" class="file-input" accept="image/*">
+                <input type="file" id="videoInput" class="file-input" accept="video/*">
+
+                <!-- Webcam Controls -->
+                <button class="btn btn-danger" id="webcamBtn" onclick="toggleWebcam()">
+                    📹 Start Webcam
+                </button>
+
+                <!-- Settings -->
+                <div class="settings">
+                    <h4 class="section-title">⚙️ Settings</h4>
+                    
+                    <div class="setting-group">
+                        <label class="setting-label">Confidence Threshold</label>
+                        <div class="range-container">
+                            <input type="range" id="confidenceRange" class="setting-input" min="0.1" max="1.0" step="0.1" value="0.5">
+                            <span class="range-value" id="confidenceValue">0.5</span>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label class="setting-label">Model</label>
+                        <select id="modelSelect" class="setting-input">
+                            <option value="yolov8n.pt">YOLOv8n (Fastest)</option>
+                            <option value="yolov8s.pt">YOLOv8s (Balanced)</option>
+                            <option value="yolov8m.pt">YOLOv8m (Better Accuracy)</option>
+                            <option value="yolov8l.pt">YOLOv8l (High Accuracy)</option>
+                            <option value="yolov8x.pt">YOLOv8x (Best Accuracy)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="display-panel">
+                <h3 class="section-title">🖼️ Detection Results</h3>
+                
+                <!-- Stats -->
+                <div class="stats-container">
+                    <div class="stat-item">
+                        <span class="stat-value" id="objectCount">0</span>
+                        <span class="stat-label">Objects</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="avgConfidence">0%</span>
+                        <span class="stat-label">Avg Confidence</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="uniqueClasses">0</span>
+                        <span class="stat-label">Classes</span>
+                    </div>
+                </div>
+
+                <!-- Display Area -->
+                <div class="display-area" id="displayArea">
+                    <div class="placeholder">
+                        Select an image, video, or start webcam to begin detection
+                    </div>
+                </div>
+
+                <!-- Results -->
+                <div class="results-panel" id="resultsPanel">
+                    <strong>📊 Detection Summary</strong>
+                    <div id="detectionResults"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span id="statusText">Ready for detection</span>
+    </div>
+
+    <script>
+        // Initialize Socket.IO
+        const socket = io();
+        
+        // Global variables
+        let webcamActive = false;
+        let currentDetections = [];
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            setupDragAndDrop();
+        });
+
+        function setupEventListeners() {
+            // Confidence range slider
+            const confidenceRange = document.getElementById('confidenceRange');
+            const confidenceValue = document.getElementById('confidenceValue');
+            
+            confidenceRange.addEventListener('input', function() {
+                confidenceValue.textContent = this.value;
+            });
+
+            // Model selection
+            document.getElementById('modelSelect').addEventListener('change', function() {
+                changeModel(this.value);
+            });
+
+            // File inputs
+            document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+            document.getElementById('videoInput').addEventListener('change', handleVideoUpload);
+        }
+
+        function setupDragAndDrop() {
+            const imageUpload = document.getElementById('imageUpload');
+            const videoUpload = document.getElementById('videoUpload');
+
+            [imageUpload, videoUpload].forEach(area => {
+                area.addEventListener('dragover', handleDragOver);
+                area.addEventListener('dragleave', handleDragLeave);
+                area.addEventListener('drop', handleDrop);
+            });
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.currentTarget.classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                const isImage = file.type.startsWith('image/');
+                const isVideo = file.type.startsWith('video/');
+                
+                if (e.currentTarget.id === 'imageUpload' && isImage) {
+                    processImageFile(file);
+                } else if (e.currentTarget.id === 'videoUpload' && isVideo) {
+                    processVideoFile(file);
+                } else {
+                    showNotification('Please drop the correct file type', 'error');
+                }
+            }
+        }
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                processImageFile(file);
+            }
+        }
+
+        function handleVideoUpload(e) {
+            const file = e.target.files[0];
+            if (file) {
+                processVideoFile(file);
+            }
+        }
+
+        function processImageFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('confidence', document.getElementById('confidenceRange').value);
+
+            updateStatus('Processing image...');
+            document.getElementById('imageUpload').classList.add('processing');
+
+            fetch('/upload_image', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('imageUpload').classList.remove('processing');
+                
+                if (data.success) {
+                    displayImageResult(data);
+                    updateStatus(`Detected ${data.total_objects} objects`);
+                    showNotification('Image processed successfully!', 'success');
+                } else {
+                    showNotification(data.error || 'Error processing image', 'error');
+                    updateStatus('Error processing image');
+                }
+            })
+            .catch(error => {
+                document.getElementById('imageUpload').classList.remove('processing');
+                showNotification('Error uploading image', 'error');
+                updateStatus('Upload failed');
+            });
+        }
+
+        function processVideoFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('confidence', document.getElementById('confidenceRange').value);
+
+            updateStatus('Processing video...');
+            document.getElementById('videoUpload').classList.add('processing');
+
+            fetch('/upload_video', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.processing) {
+                    showNotification('Video processing started...', 'info');
+                    updateStatus('Processing video... Please wait');
+                } else {
+                    document.getElementById('videoUpload').classList.remove('processing');
+                    showNotification(data.error || 'Error processing video', 'error');
+                    updateStatus('Error processing video');
+                }
+            })
+            .catch(error => {
+                document.getElementById('videoUpload').classList.remove('processing');
+                showNotification('Error uploading video', 'error');
+                updateStatus('Upload failed');
+            });
+        }
+
+        function toggleWebcam() {
+            const btn = document.getElementById('webcamBtn');
+            
+            if (!webcamActive) {
+                const confidence = document.getElementById('confidenceRange').value;
+                socket.emit('start_webcam', { confidence: parseFloat(confidence) });
+                btn.textContent = '⏹️ Stop Webcam';
+                btn.classList.remove('btn-danger');
+                btn.classList.add('btn-warning');
+                updateStatus('Starting webcam...');
+            } else {
+                socket.emit('stop_webcam');
+                btn.textContent = '📹 Start Webcam';
+                btn.classList.remove('btn-warning');
+                btn.classList.add('btn-danger');
+                webcamActive = false;
+                updateStatus('Stopping webcam...');
+            }
+        }
+
+        function changeModel(modelName) {
+            const confidence = document.getElementById('confidenceRange').value;
+            
+            updateStatus('Changing model...');
+            
+            fetch('/change_model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: modelName,
+                    confidence: parseFloat(confidence)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification(data.message, 'success');
+                    updateStatus('Model changed successfully');
+                } else {
+                    showNotification(data.error || 'Error changing model', 'error');
+                    updateStatus('Error changing model');
+                }
+            })
+            .catch(error => {
+                showNotification('Error changing model', 'error');
+                updateStatus('Model change failed');
+            });
+        }
+
+        function displayImageResult(data) {
+            const displayArea = document.getElementById('displayArea');
+            
+            if (data.result_image) {
+                displayArea.innerHTML = `<img src="${data.result_image}" class="result-image" alt="Detection Result">`;
+            }
+            
+            updateDetectionResults(data.detections);
+            updateStats(data.detections);
+        }
+
+        function updateDetectionResults(detections) {
+            currentDetections = detections;
+            const resultsDiv = document.getElementById('detectionResults');
+            
+            if (detections.length === 0) {
+                resultsDiv.innerHTML = '<div style="text-align: center; color: #7f8c8d; margin-top: 20px;">No objects detected</div>';
+                return;
+            }
+
+            let html = '';
+            detections.forEach(detection => {
+                const confidence = Math.round(detection.confidence * 100);
+                html += `
+                    <div class="detection-item">
+                        <span class="detection-class">${detection.class_name}</span>
+                        <span class="detection-confidence">${confidence}%</span>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        function updateStats(detections) {
+            const objectCount = detections.length;
+            const avgConfidence = objectCount > 0 ? 
+                Math.round((detections.reduce((sum, d) => sum + d.confidence, 0) / objectCount) * 100) : 0;
+            const uniqueClasses = new Set(detections.map(d => d.class_name)).size;
+
+            document.getElementById('objectCount').textContent = objectCount;
+            document.getElementById('avgConfidence').textContent = avgConfidence + '%';
+            document.getElementById('uniqueClasses').textContent = uniqueClasses;
+        }
+
+        function updateStatus(message) {
+            document.getElementById('statusText').textContent = message;
+        }
+
+        function showNotification(message, type = 'info') {
+            // Remove existing notification
+            const existing = document.querySelector('.notification');
+            if (existing) {
+                existing.remove();
+            }
+
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
+        // Socket.IO event handlers
+        socket.on('webcam_started', function(data) {
+            webcamActive = true;
+            showNotification('Webcam started successfully!', 'success');
+            updateStatus('Webcam active');
+        });
+
+        socket.on('webcam_frame', function(data) {
+            const displayArea = document.getElementById('displayArea');
+            displayArea.innerHTML = `<img src="data:image/jpeg;base64,${data.image}" class="webcam-feed" alt="Webcam Feed">`;
+            
+            updateDetectionResults(data.detections);
+            updateStats(data.detections);
+        });
+
+        socket.on('webcam_stopped', function(data) {
+            webcamActive = false;
+            updateStatus('Webcam stopped');
+            document.getElementById('displayArea').innerHTML = '<div class="placeholder">Webcam stopped</div>';
+        });
+
+        socket.on('webcam_error', function(data) {
+            showNotification(data.error, 'error');
+            updateStatus('Webcam error');
+            webcamActive = false;
+            
+            const btn = document.getElementById('webcamBtn');
+            btn.textContent = '📹 Start Webcam';
+            btn.classList.remove('btn-warning');
+            btn.classList.add('btn-danger');
+        });
+
+        socket.on('video_complete', function(data) {
+            document.getElementById('videoUpload').classList.remove('processing');
+            
+            if (data.success) {
+                showNotification(data.message, 'success');
+                updateStatus('Video processing completed');
+                
+                if (data.result_video) {
+                    const displayArea = document.getElementById('displayArea');
+                    displayArea.innerHTML = `
+                        <video controls class="result-image" style="max-width: 100%; max-height: 100%;">
+                            <source src="${data.result_video}" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                    `;
+                }
+            } else {
+                showNotification(data.error || 'Video processing failed', 'error');
+                updateStatus('Video processing failed');
+            }
+        });
+    </script>
+</body>
+</html>
