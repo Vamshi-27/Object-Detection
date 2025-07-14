@@ -161,71 +161,111 @@ def handle_start_webcam(data):
     """Start webcam detection"""
     global webcam_active, webcam_thread
     
+    print(f"🎥 Webcam start request received: {data}")
+    
     if not detector:
+        print("❌ Detector not initialized")
         emit('webcam_error', {'error': 'Detector not initialized'})
         return
     
     if webcam_active:
+        print("⚠️ Webcam already active")
         emit('webcam_error', {'error': 'Webcam already active'})
         return
     
+    # Test webcam access first
+    test_cap = cv2.VideoCapture(0)
+    if not test_cap.isOpened():
+        print("❌ Cannot access webcam")
+        emit('webcam_error', {'error': 'Cannot access webcam. Please check if it is connected and not being used by another application.'})
+        test_cap.release()
+        return
+    test_cap.release()
+    
     confidence = data.get('confidence', 0.5)
     detector.confidence = confidence
+    print(f"🎯 Setting confidence to: {confidence}")
     
     def webcam_loop():
         global webcam_active
         webcam_active = True
         cap = cv2.VideoCapture(0)
         
+        # Set webcam properties for better performance
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FPS, 30)
+        
         if not cap.isOpened():
-            emit('webcam_error', {'error': 'Could not open webcam'})
+            socketio.emit('webcam_error', {'error': 'Could not open webcam'})
             webcam_active = False
             return
         
-        emit('webcam_started', {'message': 'Webcam started successfully'})
+        socketio.emit('webcam_started', {'message': 'Webcam started successfully'})
         
-        while webcam_active:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            # Run detection
-            results = detector.model(frame, conf=detector.confidence)
-            annotated_frame = results[0].plot()
-            
-            # Convert to base64 for web display
-            _, buffer = cv2.imencode('.jpg', annotated_frame)
-            img_base64 = base64.b64encode(buffer).decode('utf-8')
-            
-            # Get detection info
-            detections = []
-            if results[0].boxes is not None:
-                for box in results[0].boxes:
-                    detection = {
-                        'class_name': detector.model.names[int(box.cls[0])],
-                        'confidence': float(box.conf[0])
-                    }
-                    detections.append(detection)
-            
-            socketio.emit('webcam_frame', {
-                'image': img_base64,
-                'detections': detections,
-                'total_objects': len(detections)
-            })
-            
-            time.sleep(0.1)  # Limit FPS
-        
-        cap.release()
-        emit('webcam_stopped', {'message': 'Webcam stopped'})
+        try:
+            while webcam_active:
+                ret, frame = cap.read()
+                if not ret:
+                    print("Failed to read frame from webcam")
+                    socketio.emit('webcam_error', {'error': 'Failed to read frame from webcam'})
+                    break
+                
+                try:
+                    # Run detection
+                    results = detector.model(frame, conf=detector.confidence)
+                    annotated_frame = results[0].plot()
+                    
+                    # Convert to base64 for web display
+                    _, buffer = cv2.imencode('.jpg', annotated_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
+                    img_base64 = base64.b64encode(buffer).decode('utf-8')
+                    
+                    # Get detection info
+                    detections = []
+                    if results[0].boxes is not None:
+                        for box in results[0].boxes:
+                            detection = {
+                                'class_name': detector.model.names[int(box.cls[0])],
+                                'confidence': float(box.conf[0])
+                            }
+                            detections.append(detection)
+                    
+                    socketio.emit('webcam_frame', {
+                        'image': img_base64,
+                        'detections': detections,
+                        'total_objects': len(detections)
+                    })
+                    
+                except Exception as e:
+                    print(f"Error in detection: {e}")
+                    socketio.emit('webcam_error', {'error': f'Detection error: {str(e)}'})
+                    break
+                
+                time.sleep(0.1)  # Limit FPS to ~10 FPS
+                
+        except Exception as e:
+            print(f"Webcam loop error: {e}")
+            socketio.emit('webcam_error', {'error': f'Webcam error: {str(e)}'})
+        finally:
+            cap.release()
+            webcam_active = False
+            socketio.emit('webcam_stopped', {'message': 'Webcam stopped'})
     
-    webcam_thread = threading.Thread(target=webcam_loop, daemon=True)
-    webcam_thread.start()
+    try:
+        webcam_thread = threading.Thread(target=webcam_loop, daemon=True)
+        webcam_thread.start()
+        print("🚀 Webcam thread started successfully")
+    except Exception as e:
+        print(f"❌ Failed to start webcam thread: {e}")
+        emit('webcam_error', {'error': f'Failed to start webcam thread: {str(e)}'})
 
 @socketio.on('stop_webcam')
 def handle_stop_webcam():
     """Stop webcam detection"""
     global webcam_active
+    print("🛑 Webcam stop request received")
     webcam_active = False
+    emit('webcam_stopped', {'message': 'Webcam stop signal sent'})
 
 @app.route('/change_model', methods=['POST'])
 def change_model():
