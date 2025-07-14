@@ -115,9 +115,6 @@ Object-Detection/
 - Use **YOLOv8m** or **YOLOv8l** for better accuracy with cars and small objects
 - Use **YOLOv8x** for maximum detection accuracy
 
-## 📝 License
-
-This project is licensed under the MIT License.
 
 ---
 
