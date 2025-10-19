@@ -7,6 +7,7 @@ __pycache__/
 env/
 venv/
 yolo_env/
+clean_env/
 
 # YOLO models (optional - remove this line if you want to track models)
 *.pt
