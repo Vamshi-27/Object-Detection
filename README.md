@@ -41,13 +41,13 @@ python web_interface.py
 
 2. **Create virtual environment** (recommended):
    ```bash
-   python -m venv yolo_env
+   python -m venv clean_env
    
    # Windows
-   yolo_env\Scripts\activate
+   clean_env\Scripts\activate
    
    # macOS/Linux
-   source yolo_env/bin/activate
+   source clean_env/bin/activate
    ```
 
 3. **Install dependencies**:
